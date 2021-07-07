@@ -22,6 +22,8 @@ using Bicep.Decompiler.Exceptions;
 using Bicep.Decompiler;
 using Bicep.Core.Configuration;
 using Bicep.Core.UnitTests.Configuration;
+using Bicep.Core.Modules;
+using Bicep.Core.Registry;
 
 namespace Bicep.Core.IntegrationTests
 {
@@ -97,8 +99,8 @@ namespace Bicep.Core.IntegrationTests
             var workspace = new Workspace();
             workspace.UpsertSyntaxTrees(syntaxTrees);
 
-            var fileResolver = new FileResolver();
-            var syntaxTreeGrouping = SyntaxTreeGroupingBuilder.Build(fileResolver, workspace, bicepUri);
+            FileResolver fileResolver = new FileResolver();
+            var syntaxTreeGrouping = SyntaxTreeGroupingBuilder.Build(fileResolver, new ModuleRegistryDispatcher(fileResolver), workspace, bicepUri);
             var compilation = new Compilation(typeProvider, syntaxTreeGrouping);
             var diagnosticsBySyntaxTree = compilation.GetAllDiagnosticsBySyntaxTree(new ConfigHelper().GetDisabledLinterConfig());
 

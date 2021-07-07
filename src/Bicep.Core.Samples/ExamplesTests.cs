@@ -27,6 +27,8 @@ using Newtonsoft.Json.Linq;
 using Bicep.Core.Configuration;
 using Bicep.Core.Analyzers.Linter;
 using Bicep.Core.UnitTests.Configuration;
+using Bicep.Core.Modules;
+using Bicep.Core.Registry;
 
 namespace Bicep.Core.Samples
 {
@@ -120,8 +122,9 @@ namespace Bicep.Core.Samples
             var outputDirectory = FileHelper.SaveEmbeddedResourcesWithPathPrefix(TestContext, typeof(ExamplesTests).Assembly, parentStream);
             var bicepFileName = Path.Combine(outputDirectory, Path.GetFileName(example.BicepStreamName));
             var jsonFileName = Path.Combine(outputDirectory, Path.GetFileName(example.JsonStreamName));
-            
-            var syntaxTreeGrouping = SyntaxTreeGroupingBuilder.Build(BicepTestConstants.FileResolver, new Workspace(), PathHelper.FilePathToFileUrl(bicepFileName));
+
+            FileResolver fileResolver = BicepTestConstants.FileResolver;
+            var syntaxTreeGrouping = SyntaxTreeGroupingBuilder.Build(fileResolver, new ModuleRegistryDispatcher(fileResolver), new Workspace(), PathHelper.FilePathToFileUrl(bicepFileName));
             var compilation = new Compilation(AzResourceTypeProvider.CreateWithAzTypes(), syntaxTreeGrouping);
             var emitter = new TemplateEmitter(compilation.GetEntrypointSemanticModel(), BicepTestConstants.DevAssemblyFileVersion);
 

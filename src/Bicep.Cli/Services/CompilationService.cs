@@ -4,6 +4,7 @@
 using Bicep.Cli.Logging;
 using Bicep.Core.Extensions;
 using Bicep.Core.FileSystem;
+using Bicep.Core.Registry;
 using Bicep.Core.Semantics;
 using Bicep.Core.Syntax;
 using Bicep.Core.Workspaces;
@@ -16,7 +17,8 @@ namespace Bicep.Cli.Services
     public class CompilationService
     {
         private readonly IDiagnosticLogger diagnosticLogger;
-        private readonly FileResolver fileResolver;
+        private readonly IFileResolver fileResolver;
+        private readonly IModuleRegistryDispatcher dispatcher;
         private readonly InvocationContext invocationContext;
         private readonly Workspace workspace;
 
@@ -24,6 +26,7 @@ namespace Bicep.Cli.Services
         {
             this.diagnosticLogger = diagnosticLogger;
             this.fileResolver = new FileResolver();
+            this.dispatcher = new ModuleRegistryDispatcher(this.fileResolver);
             this.invocationContext = invocationContext;
             this.workspace = new Workspace();
         }
@@ -32,14 +35,16 @@ namespace Bicep.Cli.Services
         {
             var inputUri = PathHelper.FilePathToFileUrl(inputPath);
 
-            var syntaxTreeGrouping = SyntaxTreeGroupingBuilder.Build(this.fileResolver, this.workspace, inputUri);
+            var syntaxTreeGrouping = SyntaxTreeGroupingBuilder.Build(this.fileResolver, this.dispatcher, this.workspace, inputUri);
+            var failures = dispatcher.RestoreModules(syntaxTreeGrouping.ModulesToRestore);
+            syntaxTreeGrouping = SyntaxTreeGroupingBuilder.Rebuild(dispatcher, new Workspace(), syntaxTreeGrouping, failures);
 
             var compilation = new Compilation(this.invocationContext.ResourceTypeProvider, syntaxTreeGrouping);
 
             LogDiagnostics(compilation);
 
             return compilation;
-        }  
+        }
 
         public (Uri, ImmutableDictionary<Uri, string>) Decompile(string inputPath, string outputPath)
         {

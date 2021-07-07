@@ -4,6 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Bicep.Core.FileSystem;
+using Bicep.Core.Modules;
+using Bicep.Core.Registry;
 using Bicep.Core.Syntax;
 using Bicep.Core.Workspaces;
 
@@ -24,7 +26,7 @@ namespace Bicep.Core.UnitTests.Utils
             var syntaxTrees = files.Select(kvp => SyntaxTree.Create(kvp.Key, kvp.Value));
             workspace.UpsertSyntaxTrees(syntaxTrees);
 
-            return SyntaxTreeGroupingBuilder.Build(fileResolver, workspace, entryFileUri);
+            return SyntaxTreeGroupingBuilder.Build(fileResolver, new ModuleRegistryDispatcher(fileResolver), workspace, entryFileUri);
         }
     }
 }

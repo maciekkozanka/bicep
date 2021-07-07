@@ -96,6 +96,8 @@ namespace Bicep.Cli
 
                 // Adds the ILogger and IDiagnosticlogger
                 .AddSingleton(CreateLoggerFactory().CreateLogger("bicep"))
+
+            // TODO: This should reuse ASTs and possibly other data as well
                 .AddSingleton<IDiagnosticLogger, BicepDiagnosticLogger>()
 
                 // Handles the context of this invocation

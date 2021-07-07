@@ -207,6 +207,7 @@ namespace Bicep.LanguageServer.Snippets
                 ImmutableHashSet.Create(syntaxTree),
                 ImmutableDictionary.Create<ModuleDeclarationSyntax, SyntaxTree>(),
                 ImmutableDictionary.Create<ModuleDeclarationSyntax, DiagnosticBuilder.ErrorBuilderDelegate>(),
+                ImmutableHashSet<ModuleDeclarationSyntax>.Empty,
                 fileResolver);
 
             Compilation compilation = new Compilation(AzResourceTypeProvider.CreateWithAzTypes(), syntaxTreeGrouping);

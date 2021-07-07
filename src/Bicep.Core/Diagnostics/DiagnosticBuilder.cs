@@ -570,6 +570,7 @@ namespace Bicep.Core.Diagnostics
                 null,
                 new CodeFix($"Change \"{property}\" to \"{suggestedProperty}\"", true, CodeManipulator.Replace(TextSpan, suggestedProperty)));
 
+            // TODO: Message needs to be registry-aware
             public ErrorDiagnostic ModulePathHasNotBeenSpecified() => new(
                 TextSpan,
                 "BCP090",
@@ -1078,7 +1079,6 @@ namespace Bicep.Core.Diagnostics
                 TextSpan,
                 "BCP183",
                 $"The value of the module \"{LanguageConstants.ModuleParamsPropertyName}\" property must be an object literal.");
-            
             public ErrorDiagnostic FileExceedsMaximumSize(string filePath, long maxSize, string unit) => new(
                TextSpan,
                "BCP184",
@@ -1089,6 +1089,41 @@ namespace Bicep.Core.Diagnostics
                DiagnosticLevel.Info,
                "BCP185",
                $"Encoding mismatch. File was loaded with '{detectedEncoding}' encoding.");
+
+            public ErrorDiagnostic UnknownModuleReferenceScheme(string badScheme, IEnumerable<string> allowedSchemes) => new(
+                TextSpan,
+                "BCP186",
+                $"The specified module reference scheme \"{badScheme}\" is not recognized. Specify a local path to a Bicep file or a module reference using one of the following schemes: {ToQuotedString(allowedSchemes)}");
+
+            public ErrorDiagnostic InvalidNuGetPackageReference(string badRef) => new(
+                TextSpan,
+                "BCP187",
+                $"The specified NuGet package reference \"{badRef}\" is not valid. Specify a reference in the format of \"nuget:<package>@<version>\".");
+
+            public ErrorDiagnostic InvalidOciArtifactReference(string badRef) => new(
+                TextSpan,
+                "BCP188",
+                $"The specified OCI artifact reference \"{badRef}\" is not valid. Specify a reference in the format of \"oci:<artifact uri>:<tag>\".");
+
+            // TODO: This error is context sensitive:
+            // - In CLI, it's permanent and only likely to occur with bicep build --no-init.
+            // - In VS code, it's transient until the background init finishes.
+            //
+            // Should it be split into two separate errors instead?
+            public ErrorDiagnostic ModuleRequiresRestore(string moduleRef) => new(
+                TextSpan,
+                "BCP189",
+                $"The module with reference \"{moduleRef}\" has not been restored.");
+
+            public ErrorDiagnostic ModuleRestoreFailed(string moduleRef) => new(
+                TextSpan,
+                "BCP190",
+                $"Unable to restore the module with reference \"{moduleRef}\".");
+
+            public ErrorDiagnostic ModuleRestoreFailedWithMessage(string moduleRef, string message) => new(
+                TextSpan,
+                "BCP191",
+                $"Unable to restore the module with reference \"{moduleRef}\": {message}");
         }
 
         public static DiagnosticBuilderInternal ForPosition(TextSpan span)
