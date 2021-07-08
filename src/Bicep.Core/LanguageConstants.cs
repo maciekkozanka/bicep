@@ -302,9 +302,6 @@ namespace Bicep.Core
             yield return new TypeProperty("identity", Object);
 
             yield return new TypeProperty("properties", Object);
-
-            var resourceRefArray = new TypedArrayType(ResourceRef, TypeSymbolValidationFlags.Default);
-            yield return new TypeProperty(ResourceDependsOnPropertyName, resourceRefArray, TypePropertyFlags.WriteOnly | TypePropertyFlags.DisallowAny);
         }
     }
 }
