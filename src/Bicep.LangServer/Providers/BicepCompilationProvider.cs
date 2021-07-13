@@ -1,6 +1,5 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-using Bicep.Core.Diagnostics;
 using Bicep.Core.FileSystem;
 using Bicep.Core.Registry;
 using Bicep.Core.Semantics;
@@ -10,7 +9,6 @@ using Bicep.Core.Workspaces;
 using Bicep.LanguageServer.CompilationManager;
 using Bicep.LanguageServer.Registry;
 using OmniSharp.Extensions.LanguageServer.Protocol;
-using System.Collections.Immutable;
 
 namespace Bicep.LanguageServer.Providers
 {
@@ -43,9 +41,9 @@ namespace Bicep.LanguageServer.Providers
             return this.CreateContext(syntaxTreeGrouping);
         }
 
-        public CompilationContext Update(IReadOnlyWorkspace workspace, CompilationContext current, ImmutableDictionary<ModuleDeclarationSyntax, DiagnosticBuilder.ErrorBuilderDelegate> restoreFailures)
+        public CompilationContext Update(IReadOnlyWorkspace workspace, CompilationContext current)
         {
-            var syntaxTreeGrouping = SyntaxTreeGroupingBuilder.Rebuild(dispatcher, workspace, current.Compilation.SyntaxTreeGrouping, restoreFailures);
+            var syntaxTreeGrouping = SyntaxTreeGroupingBuilder.Rebuild(dispatcher, workspace, current.Compilation.SyntaxTreeGrouping);
 
             return this.CreateContext(syntaxTreeGrouping);
         }

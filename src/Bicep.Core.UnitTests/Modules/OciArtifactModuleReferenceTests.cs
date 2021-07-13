@@ -37,7 +37,8 @@ namespace Bicep.Core.UnitTests.Modules
 
         private static OciArtifactModuleReference Parse(string package)
         {
-            var parsed = OciArtifactModuleReference.TryParse(package, out _);
+            var parsed = OciArtifactModuleReference.TryParse(package, out var failureBuilder);
+            failureBuilder.Should().BeNull();
             parsed.Should().NotBeNull();
             return parsed!;
         }

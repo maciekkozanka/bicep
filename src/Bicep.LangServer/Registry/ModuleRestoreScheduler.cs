@@ -76,8 +76,16 @@ namespace Bicep.LanguageServer.Registry
                     this.manualResetEvent.Reset();
                 }
 
-                // TODO: What to do with the results?
-                var failures = this.dispatcher.RestoreModules(references);
+                // this blocks until restore is completed
+                // the dispatcher stores the results internally and manages their lifecycle
+                this.dispatcher.RestoreModules(references);
+
+                // notify compilation manager that restore is completed
+                // to recompile the affected modules
+                foreach (var uri in uris)
+                {
+                    this.compilationManager.RefreshCompilation(uri);
+                }
             }
         }
 

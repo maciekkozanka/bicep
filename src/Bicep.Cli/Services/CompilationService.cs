@@ -36,8 +36,8 @@ namespace Bicep.Cli.Services
             var inputUri = PathHelper.FilePathToFileUrl(inputPath);
 
             var syntaxTreeGrouping = SyntaxTreeGroupingBuilder.Build(this.fileResolver, this.dispatcher, this.workspace, inputUri);
-            var failures = dispatcher.RestoreModules(syntaxTreeGrouping.ModulesToRestore);
-            syntaxTreeGrouping = SyntaxTreeGroupingBuilder.Rebuild(dispatcher, new Workspace(), syntaxTreeGrouping, failures);
+            dispatcher.RestoreModules(syntaxTreeGrouping.ModulesToRestore);
+            syntaxTreeGrouping = SyntaxTreeGroupingBuilder.Rebuild(dispatcher, new Workspace(), syntaxTreeGrouping);
 
             var compilation = new Compilation(this.invocationContext.ResourceTypeProvider, syntaxTreeGrouping);
 

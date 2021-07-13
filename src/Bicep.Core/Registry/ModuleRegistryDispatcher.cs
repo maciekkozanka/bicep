@@ -1,17 +1,17 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-using Azure.Deployments.Core.Extensions;
 using Bicep.Core.Diagnostics;
 using Bicep.Core.Extensions;
 using Bicep.Core.FileSystem;
 using Bicep.Core.Modules;
 using Bicep.Core.Syntax;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace Bicep.Core.Registry
 {
@@ -20,15 +20,112 @@ namespace Bicep.Core.Registry
         private readonly ImmutableDictionary<string, IModuleRegistry> schemes;
         private readonly ImmutableDictionary<Type, IModuleRegistry> referenceTypes;
 
+        private readonly ConditionalWeakTable<ModuleDeclarationSyntax, DiagnosticBuilder.ErrorBuilderDelegate> restoreStatuses;
+
         public ModuleRegistryDispatcher(IFileResolver fileResolver)
         {
             (this.schemes, this.referenceTypes) = Initialize(fileResolver);
             this.AvailableSchemes = this.schemes.Keys.OrderBy(s => s).ToImmutableArray();
+            this.restoreStatuses = new ConditionalWeakTable<ModuleDeclarationSyntax, DiagnosticBuilder.ErrorBuilderDelegate>();
         }
 
         public IEnumerable<string> AvailableSchemes { get; }
 
-        public ModuleReference? TryParseModuleReference(string reference, out DiagnosticBuilder.ErrorBuilderDelegate? failureBuilder)
+        public bool ValidateModuleReference(ModuleDeclarationSyntax module, [NotNullWhen(false)] out DiagnosticBuilder.ErrorBuilderDelegate? failureBuilder) =>
+            this.TryGetModuleReference(module, out failureBuilder) is not null;
+
+        public bool IsModuleAvailable(ModuleDeclarationSyntax module, out DiagnosticBuilder.ErrorBuilderDelegate? failureBuilder)
+        {
+            var reference = GetModuleReference(module);
+            Type refType = reference.GetType();
+            if (!this.referenceTypes.TryGetValue(refType, out var registry))
+            {
+                throw new NotImplementedException($"Unexpected module reference type '{refType.Name}'");
+            }
+
+            // have we already failed to restore this module?
+            // TODO: This needs to reset after some time
+            if(this.HasRestoreFailed(module, out var restoreFailureBuilder))
+            {
+                failureBuilder = restoreFailureBuilder;
+                return false;
+            }
+                        
+            if(registry.IsModuleRestoreRequired(reference))
+            {
+                // module is not present on the local file system
+                // TODO: This error needs to have different text in CLI vs the language server
+                failureBuilder = x => x.ModuleRequiresRestore(reference.FullyQualifiedReference);
+                return false;
+            }
+
+            failureBuilder = null;
+            return true;
+        }
+
+        public Uri? TryGetLocalModuleEntryPointPath(Uri parentModuleUri, ModuleDeclarationSyntax module, out DiagnosticBuilder.ErrorBuilderDelegate? failureBuilder)
+        {
+            // has restore already failed for this module?
+            if(this.HasRestoreFailed(module, out var restoreFailureBuilder))
+            {
+                failureBuilder = restoreFailureBuilder;
+                return null;
+            }
+
+            var reference = GetModuleReference(module);
+            Type refType = reference.GetType();
+            if (this.referenceTypes.TryGetValue(refType, out var registry))
+            {
+                return registry.TryGetLocalModuleEntryPointPath(parentModuleUri, reference, out failureBuilder);
+            }
+
+            throw new NotImplementedException($"Unexpected module reference type '{refType.Name}'");
+        }
+
+        public void RestoreModules(IEnumerable<ModuleDeclarationSyntax> modules)
+        {
+            // WARNING: The various operations on ModuleReference objects here rely on the custom Equals() implementation and NOT on object identity
+
+            // one module ref can be associated with multiple module declarations
+            var referenceToModules = modules.ToLookup(module => GetModuleReference(module));
+
+            var references = modules.Select(module => GetModuleReference(module)).Distinct();
+
+            // split module refs by reference type
+            var referencesByRefType = references.ToLookup(@ref => @ref.GetType());
+
+            // send each set of refs to its own registry
+            foreach (var referenceType in this.referenceTypes.Keys.Where(refType => referencesByRefType.Contains(refType)))
+            {
+                var restoreStatuses = this.referenceTypes[referenceType].RestoreModules(referencesByRefType[referenceType]);
+
+                // update restore status for each failed module restore
+                foreach(var (failedReference, failureBuilder) in restoreStatuses)
+                {
+                    foreach(var failedModule in referenceToModules[failedReference])
+                    {
+                        this.SetRestoreFailure(failedModule, failureBuilder);
+                    }
+                }
+            }
+        }
+
+        private ModuleReference GetModuleReference(ModuleDeclarationSyntax module) =>
+            TryGetModuleReference(module, out _) ?? throw new InvalidOperationException("The specified module reference is not valid. Ensure it is validated before calling.");
+
+        private ModuleReference? TryGetModuleReference(ModuleDeclarationSyntax module, out DiagnosticBuilder.ErrorBuilderDelegate? failureBuilder)
+        {
+            var moduleReferenceString = SyntaxHelper.TryGetModulePath(module, out var getModulePathFailureBuilder);
+            if (moduleReferenceString is null)
+            {
+                failureBuilder = getModulePathFailureBuilder ?? throw new InvalidOperationException($"Expected {nameof(SyntaxHelper.TryGetModulePath)} to provide failure diagnostics.");
+                return null;
+            }
+
+            return this.TryParseModuleReference(moduleReferenceString, out failureBuilder);
+        }
+
+        private ModuleReference? TryParseModuleReference(string reference, out DiagnosticBuilder.ErrorBuilderDelegate? failureBuilder)
         {
             var parts = reference.Split(':', 2, System.StringSplitOptions.None);
             switch (parts.Length)
@@ -58,46 +155,16 @@ namespace Bicep.Core.Registry
             }
         }
 
-        public bool IsModuleRestoreRequired(ModuleReference reference)
+        private bool HasRestoreFailed(ModuleDeclarationSyntax module, out DiagnosticBuilder.ErrorBuilderDelegate? failureBuilder)
         {
-            Type refType = reference.GetType();
-            if (this.referenceTypes.TryGetValue(refType, out var registry))
-            {
-                return registry.IsModuleRestoreRequired(reference);
-            }
-
-            throw new NotImplementedException($"Unexpected module reference type '{refType.Name}'");
+            // TODO: In cases the user publishes a module after authoring an invalid reference to it, the current logic will permanently block it
+            // until the language server is restarted. We need to reset the failure status after some time or create an alternative mechanism.
+            return this.restoreStatuses.TryGetValue(module, out failureBuilder);
         }
 
-        public Uri? TryGetLocalModuleEntryPointPath(Uri parentModuleUri, ModuleReference reference, out DiagnosticBuilder.ErrorBuilderDelegate? failureBuilder)
+        private void SetRestoreFailure(ModuleDeclarationSyntax module, DiagnosticBuilder.ErrorBuilderDelegate failureBuilder)
         {
-            Type refType = reference.GetType();
-            if (this.referenceTypes.TryGetValue(refType, out var registry))
-            {
-                return registry.TryGetLocalModuleEntryPointPath(parentModuleUri, reference, out failureBuilder);
-            }
-
-            throw new NotImplementedException($"Unexpected module reference type '{refType.Name}'");
-        }
-
-        public void RestoreModules(IEnumerable<ModuleReference> references, ModuleInitErrorDelegate onErrorAction)
-        {
-            var lookup = references.ToLookup(@ref => @ref.GetType());
-
-            foreach (var referenceType in this.referenceTypes.Keys.Where(refType => lookup.Contains(refType)))
-            {
-                this.referenceTypes[referenceType].RestoreModules(lookup[referenceType], onErrorAction);
-            }
-        }
-
-        public IDictionary<ModuleDeclarationSyntax, DiagnosticBuilder.ErrorBuilderDelegate> RestoreModules(IEnumerable<ModuleDeclarationSyntax> modules)
-        {
-            var referenceLookup = modules.ToImmutableDictionaryExcludingNull(module => this.TryGetModuleReference(module, out _), EqualityComparer<ModuleReference>.Default);
-            var failures = new Dictionary<ModuleDeclarationSyntax, DiagnosticBuilder.ErrorBuilderDelegate>();
-
-            RestoreModules(referenceLookup.Keys, (reference, errorMessage) => failures.Add(referenceLookup[reference], x => x.ModuleRestoreFailedWithMessage(reference.FullyQualifiedReference, errorMessage)));
-
-            return failures;
+            this.restoreStatuses.AddOrUpdate(module, failureBuilder);
         }
 
         // TODO: Once we have some sort of dependency injection in the CLI, this could be simplified

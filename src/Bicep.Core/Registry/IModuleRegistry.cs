@@ -8,8 +8,6 @@ using System.Collections.Generic;
 
 namespace Bicep.Core.Registry
 {
-    public delegate void ModuleInitErrorDelegate(ModuleReference reference, string errorMessage);
-
     public interface IModuleRegistry
     {
         ModuleReference? TryParseModuleReference(string reference, out DiagnosticBuilder.ErrorBuilderDelegate? failureBuilder);
@@ -18,6 +16,6 @@ namespace Bicep.Core.Registry
 
         Uri? TryGetLocalModuleEntryPointPath(Uri parentModuleUri, ModuleReference reference, out DiagnosticBuilder.ErrorBuilderDelegate? failureBuilder);
 
-        void RestoreModules(IEnumerable<ModuleReference> reference, ModuleInitErrorDelegate onErrorAction);
+        IDictionary<ModuleReference, DiagnosticBuilder.ErrorBuilderDelegate> RestoreModules(IEnumerable<ModuleReference> references);
     }
 }

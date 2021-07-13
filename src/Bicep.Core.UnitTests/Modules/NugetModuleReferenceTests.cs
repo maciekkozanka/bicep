@@ -34,7 +34,8 @@ namespace Bicep.Core.UnitTests.Modules
 
         private static NugetModuleReference Parse(string package)
 {
-            var parsed = NugetModuleReference.TryParse(package, out _);
+            var parsed = NugetModuleReference.TryParse(package, out var failureBuilder);
+            failureBuilder.Should().BeNull();
             parsed.Should().NotBeNull();
             return parsed!;
         }

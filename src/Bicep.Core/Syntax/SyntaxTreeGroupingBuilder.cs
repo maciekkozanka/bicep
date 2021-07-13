@@ -62,10 +62,10 @@ namespace Bicep.Core.Syntax
         {
             var builder = new SyntaxTreeGroupingBuilder(fileResolver, dispatcher, workspace);
 
-            return builder.Build(entryFileUri, isRebuild: false);
+            return builder.Build(entryFileUri);
         }
 
-        public static SyntaxTreeGrouping Rebuild(IModuleRegistryDispatcher dispatcher, IReadOnlyWorkspace workspace, SyntaxTreeGrouping current, IDictionary<ModuleDeclarationSyntax, DiagnosticBuilder.ErrorBuilderDelegate> restoreFailures)
+        public static SyntaxTreeGrouping Rebuild(IModuleRegistryDispatcher dispatcher, IReadOnlyWorkspace workspace, SyntaxTreeGrouping current)
         {
             var builder = new SyntaxTreeGroupingBuilder(current.FileResolver, dispatcher, workspace, current);
 
@@ -75,18 +75,12 @@ namespace Bicep.Core.Syntax
                 builder.moduleFailureLookup.Remove(module);
             }
 
-            foreach(var (module, failure) in restoreFailures)
-            {
-                builder.moduleLookup.Remove(module);
-                builder.moduleFailureLookup[module] = failure;
-            }
-
-            return builder.Build(current.EntryPoint.FileUri, isRebuild: true);
+            return builder.Build(current.EntryPoint.FileUri);
         }
 
-        private SyntaxTreeGrouping Build(Uri entryFileUri, bool isRebuild)
+        private SyntaxTreeGrouping Build(Uri entryFileUri)
         {
-            var entryPoint = PopulateRecursive(entryFileUri, isRebuild, out var entryPointLoadFailureBuilder);
+            var entryPoint = PopulateRecursive(entryFileUri, out var entryPointLoadFailureBuilder);
             if (entryPoint == null)
             {
                 // TODO: If we upgrade to netstandard2.1, we should be able to use the following to hint to the compiler that failureBuilder is non-null:
@@ -146,7 +140,7 @@ namespace Bicep.Core.Syntax
             return syntaxTree;
         }
 
-        private SyntaxTree? PopulateRecursive(Uri fileUri, bool isRebuild, out DiagnosticBuilder.ErrorBuilderDelegate? failureBuilder)
+        private SyntaxTree? PopulateRecursive(Uri fileUri, out DiagnosticBuilder.ErrorBuilderDelegate? failureBuilder)
         {
             var syntaxTree = TryGetSyntaxTree(fileUri, out var getSyntaxTreeFailureBuilder);
             if (syntaxTree is null)
@@ -157,41 +151,21 @@ namespace Bicep.Core.Syntax
 
             foreach (var module in GetModuleSyntaxes(syntaxTree))
             {
-                var moduleReference = this.dispatcher.TryGetModuleReference(module, out var parseReferenceFailureBuilder);
-                if(moduleReference is null)
+                if(!this.dispatcher.ValidateModuleReference(module, out var parseReferenceFailureBuilder))
                 {
-                    moduleFailureLookup[module] = parseReferenceFailureBuilder ?? throw new InvalidOperationException($"Expected {nameof(ModuleRegistryDispatcherExtensions.TryGetModuleReference)} to provide failure diagnostics.");
+                    // module reference is not valid
+                    moduleFailureLookup[module] = parseReferenceFailureBuilder ?? throw new InvalidOperationException($"Expected {nameof(IModuleRegistryDispatcher.ValidateModuleReference)} to provide failure diagnostics.");
                     continue;
                 }
 
-                if (this.dispatcher.IsModuleRestoreRequired(moduleReference))
+                if(!this.dispatcher.IsModuleAvailable(module, out var restoreErrorBuilder))
                 {
-                    // module is not cached locally
-                    // the error we generate here depends on whether this is the initial pass or a post-restore pass
-                    if(isRebuild)
-                    {
-                        // this is a pass after module restore
-                        if(moduleFailureLookup.TryGetValue(module, out var restoreErrorBuilder))
-                        {
-                            // we already have an error - let's use it as-is
-                            continue;
-                        }
-
-                        // somehow we don't have an error from the restore operation
-                        // it's either a code defect or the user cleared out the package cache after restore was done
-                        moduleFailureLookup[module] = x => x.ModuleRestoreFailed(moduleReference.FullyQualifiedReference);
-                        continue;
-                    }
-                    else
-                    {
-                        // this is the first pass and the module requires restore
-                        moduleFailureLookup[module] = x => x.ModuleRequiresRestore(moduleReference.FullyQualifiedReference);
-                        modulesToInit.Add(module);
-                        continue;
-                    }
+                    moduleFailureLookup[module] = restoreErrorBuilder ?? throw new InvalidOperationException($"Expected {nameof(IModuleRegistryDispatcher.IsModuleAvailable)} to provide failure diagnostics.");
+                    modulesToInit.Add(module);
+                    continue;
                 }
 
-                var moduleFileName = this.dispatcher.TryGetLocalModuleEntryPointPath(fileUri, moduleReference, out var moduleGetPathFailureBuilder);
+                var moduleFileName = this.dispatcher.TryGetLocalModuleEntryPointPath(fileUri, module, out var moduleGetPathFailureBuilder);
                 if (moduleFileName is null)
                 {
                     // TODO: If we upgrade to netstandard2.1, we should be able to use the following to hint to the compiler that failureBuilder is non-null:
@@ -203,7 +177,7 @@ namespace Bicep.Core.Syntax
                 // only recurse if we've not seen this module before - to avoid infinite loops
                 if (!syntaxTrees.TryGetValue(moduleFileName, out var moduleSyntaxTree))
                 {
-                    moduleSyntaxTree = PopulateRecursive(moduleFileName, isRebuild, out var modulePopulateFailureBuilder);
+                    moduleSyntaxTree = PopulateRecursive(moduleFileName, out var modulePopulateFailureBuilder);
                     
                     if (moduleSyntaxTree is null)
                     {

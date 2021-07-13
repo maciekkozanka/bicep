@@ -36,10 +36,11 @@ namespace Bicep.Core.Registry
             return null;
         }
 
-        public void RestoreModules(IEnumerable<ModuleReference> reference, ModuleInitErrorDelegate onErrorAction)
+        public IDictionary<ModuleReference, DiagnosticBuilder.ErrorBuilderDelegate> RestoreModules(IEnumerable<ModuleReference> references)
         {
             // local modules are already present on the file system
             // and do not require init
+            return ImmutableDictionary<ModuleReference, DiagnosticBuilder.ErrorBuilderDelegate>.Empty;
         }
 
         public bool IsModuleRestoreRequired(ModuleReference reference) => false;

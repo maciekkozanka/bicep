@@ -41,15 +41,18 @@ namespace Bicep.Core.Registry
             return GetEntryPointUri(typed);
         }
 
-        public void RestoreModules(IEnumerable<ModuleReference> references, ModuleInitErrorDelegate onErrorAction)
+        public IDictionary<ModuleReference, DiagnosticBuilder.ErrorBuilderDelegate> RestoreModules(IEnumerable<ModuleReference> references)
         {
+            var statuses = new Dictionary<ModuleReference, DiagnosticBuilder.ErrorBuilderDelegate>();
             foreach(var reference in references.OfType<OciArtifactModuleReference>())
             {
                 if(!this.orasClient.Pull(reference, out var errorMessage))
                 {
-                    onErrorAction(reference, errorMessage);
+                    statuses.Add(reference, x => x.ModuleRestoreFailedWithMessage(reference.FullyQualifiedReference, errorMessage));
                 }
             }
+
+            return statuses;
         }
         
         private static string GetArtifactCachePath()
