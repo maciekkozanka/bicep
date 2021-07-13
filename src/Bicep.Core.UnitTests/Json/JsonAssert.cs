@@ -6,6 +6,7 @@ using JsonDiffPatchDotNet;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Text.Json;
 
 namespace Bicep.Core.UnitTests.Json
 {

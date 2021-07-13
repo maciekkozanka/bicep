@@ -3,6 +3,7 @@
 using System;
 using System.IO;
 using System.IO.Pipelines;
+using System.Reactive.Concurrency;
 using System.Threading;
 using System.Threading.Tasks;
 using Bicep.Core.Emit;
@@ -15,6 +16,7 @@ using Bicep.LanguageServer.CompilationManager;
 using Bicep.LanguageServer.Completions;
 using Bicep.LanguageServer.Handlers;
 using Bicep.LanguageServer.Providers;
+using Bicep.LanguageServer.Registry;
 using Bicep.LanguageServer.Snippets;
 using Bicep.LanguageServer.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +34,8 @@ namespace Bicep.LanguageServer
             public IResourceTypeProvider? ResourceTypeProvider { get; set; }
 
             public IFileResolver? FileResolver { get; set; }
+
+            public IModuleRestoreScheduler? RestoreScheduler { get; set; }
         }
 
         private readonly OmnisharpLanguageServer server;
@@ -77,6 +81,9 @@ namespace Bicep.LanguageServer
         {
             await server.Initialize(cancellationToken);
 
+            var scheduler = server.GetService<IModuleRestoreScheduler>();
+            scheduler.Start();
+
             await server.WaitForExit;
         }
 
@@ -95,6 +102,7 @@ namespace Bicep.LanguageServer
             services.AddSingleton<ICompilationProvider, BicepCompilationProvider>();
             services.AddSingleton<ISymbolResolver, BicepSymbolResolver>();
             services.AddSingleton<ICompletionProvider, BicepCompletionProvider>();
+            services.AddSingleton<IModuleRestoreScheduler, ModuleRestoreScheduler>();
         }
     }
 }

@@ -1,11 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-using Azure.Deployments.Core.Extensions;
-using Bicep.Core.Modules;
 using Bicep.Core.Registry;
 using Bicep.Core.Syntax;
-using System;
+using Bicep.LanguageServer.CompilationManager;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -14,11 +13,15 @@ using System.Threading.Tasks;
 
 namespace Bicep.LanguageServer.Registry
 {
-    public sealed class ModuleRestoreScheduler
+    public sealed class ModuleRestoreScheduler : IModuleRestoreScheduler
     {
+        private record QueueItem(DocumentUri Uri, ImmutableArray<ModuleDeclarationSyntax> References);
+
         private readonly IModuleRegistryDispatcher dispatcher;
 
-        private readonly Queue<ImmutableArray<ModuleDeclarationSyntax>> queue = new();
+        private readonly ICompilationManager compilationManager;
+
+        private readonly Queue<QueueItem> queue = new();
 
         private readonly CancellationTokenSource cancellationTokenSource = new();
 
@@ -27,9 +30,10 @@ namespace Bicep.LanguageServer.Registry
 
         private Task? consumerTask;
 
-        public ModuleRestoreScheduler(IModuleRegistryDispatcher dispatcher)
+        public ModuleRestoreScheduler(IModuleRegistryDispatcher dispatcher, ICompilationManager compilationManager)
         {
             this.dispatcher = dispatcher;
+            this.compilationManager = compilationManager;
         }
 
         /// <summary>
@@ -37,12 +41,12 @@ namespace Bicep.LanguageServer.Registry
         /// Does not wait for the operation to complete and returns immediately.
         /// </summary>
         /// <param name="references">The module references</param>
-        public void RequestModuleRestore(IEnumerable<ModuleDeclarationSyntax> references)
+        public void RequestModuleRestore(DocumentUri documentUri, IEnumerable<ModuleDeclarationSyntax> references)
         {
-            var immutable = references.ToImmutableArray();
+            var item = new QueueItem(documentUri, references.ToImmutableArray());
             lock (this.queue)
             {
-                this.queue.Enqueue(immutable);
+                this.queue.Enqueue(item);
 
                 // notify consumer about new items
                 this.manualResetEvent.Set();
@@ -61,10 +65,11 @@ namespace Bicep.LanguageServer.Registry
             {
                 this.manualResetEvent.Wait(token);
 
-                var items = new List<ModuleDeclarationSyntax>();
+                var uris = new List<DocumentUri>();
+                var references = new List<ModuleDeclarationSyntax>();
                 lock (this.queue)
                 {
-                    this.UnsafeCollectModuleReferences(items);
+                    this.UnsafeCollectModuleReferences(uris, references);
                     Debug.Assert(this.queue.Count == 0, "this.queue.Count == 0");
 
                     // queue has been consumed - next iteration should block until more items have been added
@@ -72,15 +77,16 @@ namespace Bicep.LanguageServer.Registry
                 }
 
                 // TODO: What to do with the results?
-                var failures = this.dispatcher.RestoreModules(items);
+                var failures = this.dispatcher.RestoreModules(references);
             }
         }
 
-        private void UnsafeCollectModuleReferences(List<ModuleDeclarationSyntax> items)
+        private void UnsafeCollectModuleReferences(List<DocumentUri> documentUris, List<ModuleDeclarationSyntax> references)
         {
-            while(this.queue.TryDequeue(out var partial))
+            while (this.queue.TryDequeue(out var item))
             {
-                items.AddRange(partial);
+                documentUris.Add(item.Uri);
+                references.AddRange(item.References);
             }
         }
     }

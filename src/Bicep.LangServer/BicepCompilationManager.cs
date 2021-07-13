@@ -11,6 +11,7 @@ using Bicep.Core.Workspaces;
 using Bicep.LanguageServer.CompilationManager;
 using Bicep.LanguageServer.Extensions;
 using Bicep.LanguageServer.Providers;
+using Microsoft.VisualBasic.CompilerServices;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -36,6 +37,25 @@ namespace Bicep.LanguageServer
             this.workspace = workspace;
         }
 
+        public void RefreshCompilation(DocumentUri documentUri)
+        {
+            if(this.GetCompilation(documentUri) is null)
+            {
+                // the compilation we are refreshing no longer exists
+                return;
+            }
+
+            // TODO: This likely has a race condition if the user is modifying the file at the same time
+            var (_, removedTrees) = UpdateCompilationInternal(documentUri, version: null);
+            foreach (var (entrypointUri, context) in activeContexts)
+            {
+                if (removedTrees.Any(x => context.Compilation.SyntaxTreeGrouping.SyntaxTrees.Contains(x)))
+                {
+                    UpdateCompilationInternal(entrypointUri, null);
+                }
+            }
+        }
+
         public void UpsertCompilation(DocumentUri documentUri, int? version, string fileContents)
         {
             var newSyntaxTree = SyntaxTree.Create(documentUri.ToUri(), fileContents);
@@ -58,7 +78,7 @@ namespace Bicep.LanguageServer
         {
             // close and clear diagnostics for the file
             // if upsert failed to create a compilation due to a fatal error, we still need to clean up the diagnostics
-            CloseCompilationInternal(documentUri, 0, Enumerable.Empty<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>());
+            CloseCompilationInternal(documentUri, 0, Enumerable.Empty<Diagnostic>());
         }
 
         public void HandleFileChanges(IEnumerable<FileEvent> fileEvents)
@@ -125,11 +145,13 @@ namespace Bicep.LanguageServer
             return closedSyntaxTrees.ToImmutableArray();
         }
 
-        private (ImmutableArray<SyntaxTree> added, ImmutableArray<SyntaxTree> removed) UpdateCompilationInternal(DocumentUri documentUri, int? version)
+
+
+        private (ImmutableArray<SyntaxTree> added, ImmutableArray<SyntaxTree> removed) UpdateCompilationInternal(DocumentUri documentUri, int? version, CompilationContext? newContext = null)
         {
             try
             {
-                var context = this.provider.Create(workspace, documentUri);
+                var context = newContext ?? this.provider.Create(workspace, documentUri);
 
                 var output = workspace.UpsertSyntaxTrees(context.Compilation.SyntaxTreeGrouping.SyntaxTrees);
 
@@ -170,7 +192,6 @@ namespace Bicep.LanguageServer
             }
         }
 
-        // TODO: Remove the lexer part when we stop it from emitting errors
         private IEnumerable<Core.Diagnostics.IDiagnostic> GetDiagnosticsFromContext(CompilationContext context) => context.Compilation.GetEntrypointSemanticModel().GetAllDiagnostics();
 
         private void PublishDocumentDiagnostics(DocumentUri uri, int? version, IEnumerable<Diagnostic> diagnostics)
