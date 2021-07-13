@@ -34,6 +34,8 @@ namespace Bicep.LangServer.UnitTests
         {
             IFileResolver fileResolver = CreateEmptyFileResolver();
             var mockScheduler = Repository.Create<IModuleRestoreScheduler>();
+            mockScheduler.Setup(m => m.RequestModuleRestore(It.IsAny<DocumentUri>(), It.IsAny<IEnumerable<ModuleDeclarationSyntax>>()));
+
             var provider = new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver), mockScheduler.Object);
 
             var fileUri = DocumentUri.Parse($"/{DataSets.Parameters_LF.Name}.bicep");

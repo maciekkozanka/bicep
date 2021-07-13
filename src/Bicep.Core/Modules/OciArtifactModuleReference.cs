@@ -74,7 +74,7 @@ namespace Bicep.Core.Modules
             var artifactStr = rawValue.Substring(0, lastColonIndex);
             var tag = rawValue.Substring(lastColonIndex + 1);
 
-            // docker image refs (incl. OCI artifact refs) are not URI
+            // docker image refs (incl. OCI artifact refs) are not URIs
             // it appears the scheme part is missing, so we will fake it
 
             if(!Uri.TryCreate("oci://" + artifactStr, UriKind.Absolute, out var artifactUri) || string.IsNullOrWhiteSpace(tag))

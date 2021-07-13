@@ -30,11 +30,6 @@ namespace Bicep.Core.UnitTests.Modules
             getHashCode.Should().NotBeNull();
             getHashCode!.ReturnType.Should().Be(typeof(int));
             getHashCode.GetParameters().Should().BeEmpty();
-
-            var toString = GetDeclaredMethod(type, nameof(object.ToString));
-            toString.Should().NotBeNull();
-            toString!.ReturnType.Should().Be(typeof(string));
-            toString.GetParameters().Should().BeEmpty();
         }
 
         private static IEnumerable<object[]> GetModuleRefSubClasses() => AppDomain.CurrentDomain.GetAssemblies()
