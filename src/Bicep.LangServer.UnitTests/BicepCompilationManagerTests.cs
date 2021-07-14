@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 using Bicep.Core.FileSystem;
 using Bicep.Core.Registry;
+using Bicep.Core.Syntax;
 using Bicep.Core.UnitTests.Utils;
 using Bicep.Core.Workspaces;
 using Bicep.LanguageServer;
@@ -41,7 +42,7 @@ namespace Bicep.LangServer.UnitTests
             var server = CreateMockServer(document);
 
             IFileResolver fileResolver = CreateEmptyFileResolver();
-            var mockScheduler = Repository.Create<IModuleRestoreScheduler>();
+            var mockScheduler = CreateMockScheduler();
             var manager = new BicepCompilationManager(server.Object, new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver), mockScheduler.Object), new Workspace());
 
             const int version = 42;
@@ -87,7 +88,7 @@ namespace Bicep.LangServer.UnitTests
             var server = CreateMockServer(document);
 
             IFileResolver fileResolver = CreateEmptyFileResolver();
-            var mockScheduler = Repository.Create<IModuleRestoreScheduler>();
+            var mockScheduler = CreateMockScheduler();
             var manager = new BicepCompilationManager(server.Object, new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver), mockScheduler.Object), new Workspace());
 
             const int version = 42;
@@ -156,7 +157,7 @@ namespace Bicep.LangServer.UnitTests
             var server = CreateMockServer(document);
 
             IFileResolver fileResolver = CreateEmptyFileResolver();
-            var mockScheduler = Repository.Create<IModuleRestoreScheduler>();
+            var mockScheduler = CreateMockScheduler();
             var manager = new BicepCompilationManager(server.Object, new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver), mockScheduler.Object), new Workspace());
 
             const int version = 42;
@@ -221,7 +222,7 @@ namespace Bicep.LangServer.UnitTests
             var server = Repository.Create<ILanguageServerFacade>();
 
             IFileResolver fileResolver = CreateEmptyFileResolver();
-            var mockScheduler = Repository.Create<IModuleRestoreScheduler>();
+            var mockScheduler = CreateMockScheduler();
             var manager = new BicepCompilationManager(server.Object, new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver), mockScheduler.Object), new Workspace());
 
             var uri = DocumentUri.File(this.TestContext.TestName);
@@ -239,7 +240,7 @@ namespace Bicep.LangServer.UnitTests
             var server = CreateMockServer(document);
 
             IFileResolver fileResolver = CreateEmptyFileResolver();
-            var mockScheduler = Repository.Create<IModuleRestoreScheduler>();
+            var mockScheduler = CreateMockScheduler();
             var manager = new BicepCompilationManager(server.Object, new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver), mockScheduler.Object), new Workspace());
 
             var uri = DocumentUri.File(this.TestContext.TestName);
@@ -318,7 +319,7 @@ namespace Bicep.LangServer.UnitTests
             var document = CreateMockDocument(p => receivedParams = p);
 
             var server = CreateMockServer(document);
-            var mockScheduler = Repository.Create<IModuleRestoreScheduler>();
+            var mockScheduler = CreateMockScheduler();
 
             var provider = Repository.Create<ICompilationProvider>();
             const string expectedMessage = "Internal bicep exception.";
@@ -411,6 +412,14 @@ namespace Bicep.LangServer.UnitTests
                 .Returns(window.Object);
 
             return server;
+        }
+
+        private static Mock<IModuleRestoreScheduler> CreateMockScheduler()
+        {
+            var scheduler = Repository.Create<IModuleRestoreScheduler>();
+            scheduler.Setup(m => m.RequestModuleRestore(It.IsAny<DocumentUri>(), It.IsAny<IEnumerable<ModuleDeclarationSyntax>>()));
+
+            return scheduler;
         }
     }
 }
