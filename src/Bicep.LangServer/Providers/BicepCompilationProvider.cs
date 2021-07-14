@@ -21,30 +21,23 @@ namespace Bicep.LanguageServer.Providers
         private readonly IResourceTypeProvider resourceTypeProvider;
         private readonly IFileResolver fileResolver;
         private readonly IModuleRegistryDispatcher dispatcher;
-        private readonly IModuleRestoreScheduler scheduler;
 
-        public BicepCompilationProvider(IResourceTypeProvider resourceTypeProvider, IFileResolver fileResolver, IModuleRegistryDispatcher dispatcher, IModuleRestoreScheduler scheduler)
+        public BicepCompilationProvider(IResourceTypeProvider resourceTypeProvider, IFileResolver fileResolver, IModuleRegistryDispatcher dispatcher)
         {
             this.resourceTypeProvider = resourceTypeProvider;
             this.fileResolver = fileResolver;
             this.dispatcher = dispatcher;
-            this.scheduler = scheduler;
         }
 
         public CompilationContext Create(IReadOnlyWorkspace workspace, DocumentUri documentUri)
         {
             var syntaxTreeGrouping = SyntaxTreeGroupingBuilder.Build(fileResolver, dispatcher, workspace, documentUri.ToUri());
-
-            // this completes immediately
-            this.scheduler.RequestModuleRestore(documentUri, syntaxTreeGrouping.ModulesToRestore);
-
             return this.CreateContext(syntaxTreeGrouping);
         }
 
         public CompilationContext Update(IReadOnlyWorkspace workspace, CompilationContext current)
         {
             var syntaxTreeGrouping = SyntaxTreeGroupingBuilder.Rebuild(dispatcher, workspace, current.Compilation.SyntaxTreeGrouping);
-
             return this.CreateContext(syntaxTreeGrouping);
         }
 

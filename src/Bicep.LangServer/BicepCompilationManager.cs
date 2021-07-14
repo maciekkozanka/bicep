@@ -11,12 +11,11 @@ using Bicep.Core.Workspaces;
 using Bicep.LanguageServer.CompilationManager;
 using Bicep.LanguageServer.Extensions;
 using Bicep.LanguageServer.Providers;
-using Microsoft.VisualBasic.CompilerServices;
+using Bicep.LanguageServer.Registry;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
-using OmniSharp.Extensions.LanguageServer.Protocol.Window;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace Bicep.LanguageServer
@@ -26,15 +25,17 @@ namespace Bicep.LanguageServer
         private readonly IWorkspace workspace;
         private readonly ILanguageServerFacade server;
         private readonly ICompilationProvider provider;
+        private readonly IModuleRestoreScheduler scheduler;
 
         // represents compilations of open bicep files
         private readonly ConcurrentDictionary<DocumentUri, CompilationContext> activeContexts = new ConcurrentDictionary<DocumentUri, CompilationContext>();
 
-        public BicepCompilationManager(ILanguageServerFacade server, ICompilationProvider provider, IWorkspace workspace)
+        public BicepCompilationManager(ILanguageServerFacade server, ICompilationProvider provider, IWorkspace workspace, IModuleRestoreScheduler scheduler)
         {
             this.server = server;
             this.provider = provider;
             this.workspace = workspace;
+            this.scheduler = scheduler;
         }
 
         public void RefreshCompilation(DocumentUri documentUri)
@@ -152,6 +153,9 @@ namespace Bicep.LanguageServer
             try
             {
                 var context = newContext ?? this.provider.Create(workspace, documentUri);
+
+                // this completes immediately
+                this.scheduler.RequestModuleRestore(documentUri, context.Compilation.SyntaxTreeGrouping.ModulesToRestore);
 
                 var output = workspace.UpsertSyntaxTrees(context.Compilation.SyntaxTreeGrouping.SyntaxTrees);
 

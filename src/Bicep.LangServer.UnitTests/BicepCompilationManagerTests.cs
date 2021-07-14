@@ -43,7 +43,7 @@ namespace Bicep.LangServer.UnitTests
 
             IFileResolver fileResolver = CreateEmptyFileResolver();
             var mockScheduler = CreateMockScheduler();
-            var manager = new BicepCompilationManager(server.Object, new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver), mockScheduler.Object), new Workspace());
+            var manager = new BicepCompilationManager(server.Object, new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver)), new Workspace(), mockScheduler.Object);
 
             const int version = 42;
             var uri = DocumentUri.File(this.TestContext.TestName);
@@ -89,7 +89,7 @@ namespace Bicep.LangServer.UnitTests
 
             IFileResolver fileResolver = CreateEmptyFileResolver();
             var mockScheduler = CreateMockScheduler();
-            var manager = new BicepCompilationManager(server.Object, new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver), mockScheduler.Object), new Workspace());
+            var manager = new BicepCompilationManager(server.Object, new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver)), new Workspace(), mockScheduler.Object);
 
             const int version = 42;
             var uri = DocumentUri.File(this.TestContext.TestName);
@@ -158,7 +158,7 @@ namespace Bicep.LangServer.UnitTests
 
             IFileResolver fileResolver = CreateEmptyFileResolver();
             var mockScheduler = CreateMockScheduler();
-            var manager = new BicepCompilationManager(server.Object, new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver), mockScheduler.Object), new Workspace());
+            var manager = new BicepCompilationManager(server.Object, new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver)), new Workspace(), mockScheduler.Object);
 
             const int version = 42;
             var uri = DocumentUri.File(this.TestContext.TestName);
@@ -223,7 +223,7 @@ namespace Bicep.LangServer.UnitTests
 
             IFileResolver fileResolver = CreateEmptyFileResolver();
             var mockScheduler = CreateMockScheduler();
-            var manager = new BicepCompilationManager(server.Object, new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver), mockScheduler.Object), new Workspace());
+            var manager = new BicepCompilationManager(server.Object, new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver)), new Workspace(), mockScheduler.Object);
 
             var uri = DocumentUri.File(this.TestContext.TestName);
 
@@ -241,7 +241,7 @@ namespace Bicep.LangServer.UnitTests
 
             IFileResolver fileResolver = CreateEmptyFileResolver();
             var mockScheduler = CreateMockScheduler();
-            var manager = new BicepCompilationManager(server.Object, new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver), mockScheduler.Object), new Workspace());
+            var manager = new BicepCompilationManager(server.Object, new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver)), new Workspace(), mockScheduler.Object);
 
             var uri = DocumentUri.File(this.TestContext.TestName);
 
@@ -273,7 +273,9 @@ namespace Bicep.LangServer.UnitTests
             const string expectedMessage = "Internal bicep exception.";
             provider.Setup(m => m.Create(It.IsAny<IReadOnlyWorkspace>(), It.IsAny<DocumentUri>())).Throws(new InvalidOperationException(expectedMessage));
 
-            var manager = new BicepCompilationManager(server.Object, provider.Object, new Workspace());
+            var mockScheduler = CreateMockScheduler();
+
+            var manager = new BicepCompilationManager(server.Object, provider.Object, new Workspace(), mockScheduler.Object);
 
             const int version = 74;
             var uri = DocumentUri.File(this.TestContext.TestName);
@@ -336,10 +338,10 @@ namespace Bicep.LangServer.UnitTests
                     IFileResolver fileResolver = CreateEmptyFileResolver();
                     return failUpsert
                         ? throw new InvalidOperationException(expectedMessage)
-                        : new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver), mockScheduler.Object).Create(workspace, documentUri);
+                        : new BicepCompilationProvider(TestTypeHelper.CreateEmptyProvider(), fileResolver, new ModuleRegistryDispatcher(fileResolver)).Create(workspace, documentUri);
                 });
 
-            var manager = new BicepCompilationManager(server.Object, provider.Object, new Workspace());
+            var manager = new BicepCompilationManager(server.Object, provider.Object, new Workspace(), mockScheduler.Object);
 
 
             // upsert should fail because of the mock fatal exception
